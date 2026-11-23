@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SATO SA4 Excel Continuous Label Printer (PWA)</title>
+  <link rel="manifest" href="manifest.json" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 16px; color: #111; }
+    .panel { border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; border-radius: 6px; }
+    .row-cfg { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+    label { font-size: 13px; }
+    input, select, button { padding: 5px 8px; font-size: 13px; }
+    button { cursor: pointer; }
+    #previewArea { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .sticker {
+      border: 1px dashed #333;
+      padding: 6px 8px;
+      box-sizing: border-box;
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+    }
+    .sticker-line { line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none !important; }
+      #previewArea { margin: 0; gap: 0; display: block; }
+      .sticker {
+        border: none;
+        margin: 0;
+        page-break-after: always;
+        break-after: page;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <h2>SATO SA4 Excel Label Printer (PWA)</h2>
+
+    <div class="panel">
+      <strong>1. Excel & Sheet</strong><br /><br />
+      <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
+      <label>Sheet: <select id="sheetSelect"></select></label>
+      <label>Sticker W (mm): <input type="number" id="stickerW" value="50.8" step="0.1" style="width:70px" /></label>
+      <label>Sticker H (mm): <input type="number" id="stickerH" value="25.4" step="0.1" style="width:70px" /></label>
+      <label>Copies: <input type="number" id="copies" value="1" min="1" style="width:55px" /></label>
+    </div>
+
+    <div class="panel">
+      <strong>2. Up to 4 Sticker Rows (Font, Size, Style)</strong><br /><br />
+      <div id="rowsConfig"></div>
+    </div>
+
+    <div class="panel">
+      <button id="btnRender">Generate Sticker Preview</button>
+      <button id="btnPrint">Print Continuous</button>
+      <span id="statusText" style="margin-left:10px; font-size:13px;"></span>
+    </div>
+  </div>
+
+  <div id="previewArea"></div>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+
+    let workbook = null;
+    let currentRows = [];
+    let currentHeaders = [];
+
+    const fonts = ["Arial", "Calibri", "Consolas", "Courier New", "Times New Roman", "Verdana"];
+    const defaultSizes = [12, 10, 9, 9];
+    const rowsConfigEl = document.getElementById("rowsConfig");
+
+    for (let i = 0; i < 4; i++) {
+      const div = document.createElement("div");
+      div.className = "row-cfg";
+      div.innerHTML = `
+        <strong>Line ${i + 1}:</strong>
+        <select id="type_${i}">
+          <option value="col" ${i < 3 ? "selected" : ""}>Excel Column</option>
+          <option value="custom">Custom Text</option>
+          <option value="none" ${i === 3 ? "selected" : ""}>None</option>
+        </select>
+        <select id="col_${i}" style="min-width:120px;"></select>
+        <input type="text" id="custom_${i}" placeholder="Custom text" style="width:130px; display:none;" />
+        <select id="font_${i}">
+          ${fonts.map(f => `<option value="${f}">${f}</option>`).join("")}
+        </select>
+        <label>Size(pt): <input type="number" id="size_${i}" value="${defaultSizes[i]}" min="5" max="72" style="width:55px" /></label>
+        <label><input type="checkbox" id="bold_${i}" ${i === 0 ? "checked" : ""} /> Bold</label>
+        <label><input type="checkbox" id="italic_${i}" /> Italic</label>
+      `;
+      rowsConfigEl.appendChild(div);
+
+      document.getElementById(`type_${i}`).addEventListener("change", (e) => {
+        const isCustom = e.target.value === "custom";
+        const isCol = e.target.value === "col";
+        document.getElementById(`custom_${i}`).style.display = isCustom ? "inline-block" : "none";
+        document.getElementById(`col_${i}`).style.display = isCol ? "inline-block" : "none";
+      });
+    }
+
+    document.getElementById("excelFile").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const data = new Uint8Array(evt.target.result);
+        workbook = XLSX.read(data, { type: "array" });
+        const sheetSelect = document.getElementById("sheetSelect");
+        sheetSelect.innerHTML = workbook.SheetNames.map(n => `<option value="${n}">${n}</option>`).join("");
+        loadSheet(workbook.SheetNames[0]);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    document.getElementById("sheetSelect").addEventListener("change", (e) => {
+      loadSheet(e.target.value);
+    });
+
+    function loadSheet(sheetName) {
+      if (!workbook || !sheetName) return;
+      const ws = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      currentRows = json;
+      currentHeaders = json.length ? Object.keys(json[0]) : [];
+
+      for (let i = 0; i < 4; i++) {
+        const sel = document.getElementById(`col_${i}`);
+        sel.innerHTML = currentHeaders.map((h, idx) =>
+          `<option value="${h}" ${idx === i ? "selected" : ""}>${h}</option>`
+        ).join("");
+      }
+      document.getElementById("statusText").textContent = `Loaded "${sheetName}" (${currentRows.length} rows)`;
+    }
+
+    function renderStickers() {
+      const area = document.getElementById("previewArea");
+      area.innerHTML = "";
+      if (!currentRows.length) {
+        alert("Please select an Excel file first.");
+        return;
+      }
+
+      const wMm = parseFloat(document.getElementById("stickerW").value) || 50.8;
+      const hMm = parseFloat(document.getElementById("stickerH").value) || 25.4;
+      const copies = Math.max(1, parseInt(document.getElementById("copies").value, 10) || 1);
+
+      let total = 0;
+      for (const row of currentRows) {
+        const linesHtml = [];
+        let hasContent = false;
+
+        for (let i = 0; i < 4; i++) {
+          const type = document.getElementById(`type_${i}`).value;
+          if (type === "none") continue;
+
+          let text = "";
+          if (type === "custom") {
+            text = document.getElementById(`custom_${i}`).value;
+          } else {
+            const colName = document.getElementById(`col_${i}`).value;
+            text = row[colName] !== undefined ? String(row[colName]) : "";
+          }
+          if (text.trim() !== "") hasContent = true;
+
+          const font = document.getElementById(`font_${i}`).value;
+          const size = parseInt(document.getElementById(`size_${i}`).value, 10) || 10;
+          const bold = document.getElementById(`bold_${i}`).checked ? "bold" : "normal";
+          const italic = document.getElementById(`italic_${i}`).checked ? "italic" : "normal";
+
+          linesHtml.push(
+            `<div class="sticker-line" style="font-family:'${font}',sans-serif;font-size:${size}pt;font-weight:${bold};font-style:${italic};">${escapeHtml(text)}</div>`
+          );
+        }
+
+        if (!hasContent) continue;
+
+        for (let c = 0; c < copies; c++) {
+          const sticker = document.createElement("div");
+          sticker.className = "sticker";
+          sticker.style.width = `${wMm}mm`;
+          sticker.style.height = `${hMm}mm`;
+          sticker.innerHTML = linesHtml.join("");
+          area.appendChild(sticker);
+          total++;
+        }
+      }
+
+      document.getElementById("statusText").textContent = `Generated ${total} sticker(s).`;
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    document.getElementById("btnRender").addEventListener("click", renderStickers);
+    document.getElementById("btnPrint").addEventListener("click", () => {
+      renderStickers();
+      window.print();
+    });
+  </script>
+</body>
+</html>

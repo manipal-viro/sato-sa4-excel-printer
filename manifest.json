@@ -1,0 +1,8 @@
+{
+  "name": "SATO SA4 Excel Label Printer",
+  "short_name": "SATO Labels",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1f2937"
+}
