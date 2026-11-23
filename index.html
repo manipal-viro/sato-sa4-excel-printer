@@ -3,212 +3,1053 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SATO SA4 Excel Continuous Label Printer (PWA)</title>
+  <title>SATO SA4 WagLabel-Style Visual Designer (PWA)</title>
   <link rel="manifest" href="manifest.json" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 16px; color: #111; }
-    .panel { border: 1px solid #ccc; padding: 12px; margin-bottom: 12px; border-radius: 6px; }
-    .row-cfg { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
-    label { font-size: 13px; }
-    input, select, button { padding: 5px 8px; font-size: 13px; }
-    button { cursor: pointer; }
-    #previewArea { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-    .sticker {
-      border: 1px dashed #333;
-      padding: 6px 8px;
-      box-sizing: border-box;
-      overflow: hidden;
-      page-break-after: always;
-      break-after: page;
+    :root {
+      --bg: #eef2f6;
+      --panel: #ffffff;
+      --border: #cbd5e1;
+      --accent: #1d4ed8;
+      --text: #0f172a;
     }
-    .sticker-line { line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+    }
 
+    /* Top Ribbon Toolbar (WagLabel style) */
+    .toolbar {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-right: 10px;
+      border-right: 1px solid var(--border);
+    }
+    .toolbar-group:last-child { border-right: none; }
+    button {
+      background: #fff;
+      border: 1px solid #94a3b8;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    button:hover { background: #e2e8f0; }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button.primary:hover { background: #1e40af; }
+    button.danger { color: #b91c1c; border-color: #fca5a5; }
+    input, select {
+      border: 1px solid #94a3b8;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+
+    /* 3-Column Workspace */
+    .workspace {
+      display: grid;
+      grid-template-columns: 270px 1fr 290px;
+      gap: 10px;
+      padding: 10px;
+      min-height: calc(100vh - 52px);
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .card h3 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 5px;
+      color: #1e293b;
+    }
+    .field-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      gap: 6px;
+    }
+    .field-row label { font-size: 12px; color: #334155; }
+
+    /* Center Designer Canvas with MM Rulers */
+    .canvas-stage {
+      background: #cbd5e1;
+      border: 1px solid #94a3b8;
+      border-radius: 6px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: auto;
+    }
+    .ruler-wrap {
+      position: relative;
+      padding-top: 22px;
+      padding-left: 26px;
+      background: #f1f5f9;
+      border: 1px solid #94a3b8;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .ruler-top {
+      position: absolute;
+      top: 0;
+      left: 26px;
+      height: 22px;
+      background: #e2e8f0;
+      border-bottom: 1px solid #94a3b8;
+      font-size: 10px;
+      color: #475569;
+    }
+    .ruler-left {
+      position: absolute;
+      top: 22px;
+      left: 0;
+      width: 26px;
+      background: #e2e8f0;
+      border-right: 1px solid #94a3b8;
+      font-size: 10px;
+      color: #475569;
+    }
+    #stickerCanvas {
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+      user-select: none;
+    }
+    .design-obj {
+      position: absolute;
+      cursor: move;
+      border: 1px dashed transparent;
+      padding: 1px 2px;
+      white-space: nowrap;
+      line-height: 1.15;
+    }
+    .design-obj:hover { border-color: #93c5fd; }
+    .design-obj.selected {
+      border: 1px dashed #2563eb;
+      background: rgba(37, 99, 235, 0.06);
+    }
+
+    /* 4-Across Roll Strip Preview */
+    .strip-preview-box {
+      margin-top: 14px;
+      width: 100%;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .roll-row {
+      display: flex;
+      align-items: center;
+      border: 1px solid #94a3b8;
+      background: #fff;
+      margin-bottom: 8px;
+      width: fit-content;
+    }
+    .roll-cell {
+      position: relative;
+      border-right: 1px dashed #94a3b8;
+      overflow: hidden;
+      background: #fff;
+    }
+    .roll-cell:last-child { border-right: none; }
+
+    /* Control List */
+    .obj-list-item {
+      padding: 5px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .obj-list-item.active {
+      background: #dbeafe;
+      border-color: #3b82f6;
+      font-weight: 600;
+    }
+
+    /* Print Styles for 4-Across Thermal Roll */
+    #printOutput { display: none; }
     @media print {
-      body { margin: 0; }
+      @page { margin: 0; }
+      body { background: #fff; margin: 0; padding: 0; }
       .no-print { display: none !important; }
-      #previewArea { margin: 0; gap: 0; display: block; }
-      .sticker {
-        border: none;
+      #printOutput {
+        display: block !important;
         margin: 0;
+        padding: 0;
+      }
+      .print-row {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
         page-break-after: always;
         break-after: page;
+        overflow: hidden;
+      }
+      .print-sticker {
+        position: relative;
+        overflow: hidden;
+        box-sizing: border-box;
       }
     }
   </style>
 </head>
 <body>
-  <div class="no-print">
-    <h2>SATO SA4 Excel Label Printer (PWA)</h2>
 
-    <div class="panel">
-      <strong>1. Excel & Sheet</strong><br /><br />
-      <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
-      <label>Sheet: <select id="sheetSelect"></select></label>
-      <label>Sticker W (mm): <input type="number" id="stickerW" value="50.8" step="0.1" style="width:70px" /></label>
-      <label>Sticker H (mm): <input type="number" id="stickerH" value="25.4" step="0.1" style="width:70px" /></label>
-      <label>Copies: <input type="number" id="copies" value="1" min="1" style="width:55px" /></label>
+  <!-- TOP RIBBON -->
+  <div class="toolbar no-print">
+    <div class="toolbar-group">
+      <strong>SATO SA4 Studio</strong>
     </div>
-
-    <div class="panel">
-      <strong>2. Up to 4 Sticker Rows (Font, Size, Style)</strong><br /><br />
-      <div id="rowsConfig"></div>
+    <div class="toolbar-group">
+      <button id="btnAddText">+ Text Row</button>
+      <button id="btnAddBarcode">+ Barcode (128)</button>
+      <button id="btnAddQR">+ QR Code</button>
+      <button id="btnDeleteObj" class="danger">Delete Selected</button>
     </div>
-
-    <div class="panel">
-      <button id="btnRender">Generate Sticker Preview</button>
-      <button id="btnPrint">Print Continuous</button>
-      <span id="statusText" style="margin-left:10px; font-size:13px;"></span>
+    <div class="toolbar-group">
+      <button id="btnSaveTpl">Save Layout (.json)</button>
+      <button id="btnLoadTpl">Load Layout</button>
+      <input type="file" id="tplFileInput" accept=".json" style="display:none" />
+    </div>
+    <div class="toolbar-group">
+      <span>Zoom:</span>
+      <select id="zoomSelect">
+        <option value="8">8 px/mm</option>
+        <option value="10" selected>10 px/mm</option>
+        <option value="12">12 px/mm</option>
+        <option value="15">15 px/mm</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <button id="btnPreviewBatch">Preview Batch</button>
+      <button id="btnPrintBatch" class="primary">Print Continuous</button>
     </div>
   </div>
 
-  <div id="previewArea"></div>
+  <!-- MAIN WORKSPACE -->
+  <div class="workspace no-print">
+
+    <!-- LEFT PANEL: EXCEL DATASOURCE & ROLL SETTINGS -->
+    <div>
+      <div class="card">
+        <h3>1. Excel Datasource</h3>
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="width:100%; margin-bottom:6px;" />
+        <div class="field-row">
+          <label>Sheet:</label>
+          <select id="sheetSelect" style="width:150px;"></select>
+        </div>
+        <div class="field-row">
+          <label><input type="checkbox" id="hasHeaderChk" /> First Row Is Column Name</label>
+        </div>
+        <div class="field-row">
+          <label>Sample Row #:</label>
+          <input type="number" id="previewRowIdx" value="1" min="1" style="width:70px;" />
+        </div>
+        <div id="excelStatus" style="font-size:11px; color:#475569;">No Excel loaded (using sample data).</div>
+      </div>
+
+      <div class="card">
+        <h3>2. Label & 4-Across Roll Size</h3>
+        <div class="field-row">
+          <label>Preset:</label>
+          <select id="presetSelect" style="width:155px;">
+            <option value="24.8,12.7,4,1,1,0">24.8×12.7mm (4-Across)</option>
+            <option value="25,15,4,0.8,0.8,0">25×15mm OMX (4-Across)</option>
+            <option value="50.8,25.4,1,0,0,0">50.8×25.4mm (1-Across)</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label>Sticker Width (mm):</label>
+          <input type="number" id="lblW" value="24.8" step="0.1" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>Sticker Height (mm):</label>
+          <input type="number" id="lblH" value="12.7" step="0.1" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>Columns Across:</label>
+          <input type="number" id="colsAcross" value="4" min="1" max="8" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>Left Margin (mm):</label>
+          <input type="number" id="marginLeft" value="1.0" step="0.1" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>Col Gap (mm):</label>
+          <input type="number" id="colGap" value="0" step="0.1" style="width:75px;" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>3. Continuous Print Range</h3>
+        <div class="field-row">
+          <label>Start Row:</label>
+          <input type="number" id="startRow" value="1" min="1" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>End Row (0 = All):</label>
+          <input type="number" id="endRow" value="0" min="0" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>Copies per Row:</label>
+          <input type="number" id="copiesPerRow" value="1" min="1" style="width:75px;" />
+        </div>
+        <div class="field-row">
+          <label>Fill Mode:</label>
+          <select id="fillMode" style="width:145px;">
+            <option value="sequential">1 Row per Sticker (1,2,3,4)</option>
+            <option value="duplicate">Repeat Same Row Across 4</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER PANEL: VISUAL LABEL DESIGNER + 4-ACROSS PREVIEW -->
+    <div class="canvas-stage">
+      <div style="margin-bottom:8px; font-weight:600; color:#1e293b;">
+        Single Sticker Designer — Drag items or edit properties on the right
+      </div>
+      <div class="ruler-wrap" id="rulerWrap">
+        <div class="ruler-top" id="rulerTop"></div>
+        <div class="ruler-left" id="rulerLeft"></div>
+        <div id="stickerCanvas"></div>
+      </div>
+
+      <div class="strip-preview-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <strong id="batchSummary">4-Across Strip Preview (First 3 Rows)</strong>
+          <span style="font-size:11px; color:#475569;">Paper width: <span id="totalPaperW">101.2</span> mm</span>
+        </div>
+        <div id="stripPreviewContainer"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: OBJECT PROPERTIES & CONTROL LIST -->
+    <div>
+      <div class="card">
+        <h3>Selected Object Properties</h3>
+        <div id="noSelectionMsg" style="color:#64748b; font-size:12px;">Click an item on the sticker to edit.</div>
+        <div id="propForm" style="display:none;">
+          <div class="field-row">
+            <label>Source:</label>
+            <select id="propSourceType" style="width:155px;">
+              <option value="col">Excel Column</option>
+              <option value="custom">Custom Text</option>
+            </select>
+          </div>
+          <div class="field-row" id="propColRow">
+            <label>Column:</label>
+            <select id="propColSelect" style="width:155px;"></select>
+          </div>
+          <div class="field-row" id="propCustomRow" style="display:none;">
+            <label>Text:</label>
+            <input type="text" id="propCustomText" style="width:155px;" />
+          </div>
+          <div class="field-row">
+            <label>X (mm):</label>
+            <input type="number" id="propX" step="0.2" style="width:75px;" />
+            <label>Y (mm):</label>
+            <input type="number" id="propY" step="0.2" style="width:75px;" />
+          </div>
+          <div id="textOnlyProps">
+            <div class="field-row">
+              <label>Font:</label>
+              <select id="propFont" style="width:155px;">
+                <option value="Arial">Arial</option>
+                <option value="Cambria">Cambria</option>
+                <option value="Calibri">Calibri</option>
+                <option value="Consolas">Consolas</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Verdana">Verdana</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label>Size (pt):</label>
+              <input type="number" id="propSize" min="4" max="72" step="0.5" style="width:70px;" />
+              <label>Align:</label>
+              <select id="propAlign" style="width:80px;">
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="propBold" /> Bold</label>
+              <label><input type="checkbox" id="propItalic" /> Italic</label>
+              <label><input type="checkbox" id="propUnderline" /> Underline</label>
+            </div>
+          </div>
+          <div id="codeOnlyProps" style="display:none;">
+            <div class="field-row">
+              <label>Width (mm):</label>
+              <input type="number" id="propCodeW" min="4" max="80" step="0.5" style="width:70px;" />
+              <label>Height (mm):</label>
+              <input type="number" id="propCodeH" min="3" max="50" step="0.5" style="width:70px;" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Control List (Layers)</h3>
+        <div id="controlList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HIDDEN PRINT SHEET -->
+  <div id="printOutput"></div>
 
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(() => {});
     }
 
+    // Default sample rows matching user's Autoclave Stickers structure
     let workbook = null;
-    let currentRows = [];
-    let currentHeaders = [];
+    let rowsData = [
+      { Col1: "MIV", Col2: "Y.B. 1701", Col3: "Serum, 200ul", Col4: "Batch A" },
+      { Col1: "MIV", Col2: "Y.B. 1702", Col3: "Serum, 200ul", Col4: "Batch A" },
+      { Col1: "MIV", Col2: "Y.B. 1703", Col3: "Serum, 200ul", Col4: "Batch A" },
+      { Col1: "MIV", Col2: "Y.B. 1704", Col3: "Serum, 200ul", Col4: "Batch A" }
+    ];
+    let columnNames = ["Col1", "Col2", "Col3", "Col4"];
 
-    const fonts = ["Arial", "Calibri", "Consolas", "Courier New", "Times New Roman", "Verdana"];
-    const defaultSizes = [12, 10, 9, 9];
-    const rowsConfigEl = document.getElementById("rowsConfig");
+    // Up to 4 customizable rows pre-placed for 24.8 x 12.7 mm sticker
+    let objects = [
+      {
+        id: "Text-T0", type: "text", sourceType: "col", colName: "Col1", customText: "MIV",
+        x: 1.5, y: 0.6, font: "Cambria", size: 8.5, bold: true, italic: false, underline: false, align: "left"
+      },
+      {
+        id: "Text-T1", type: "text", sourceType: "col", colName: "Col2", customText: "Y.B. 1701",
+        x: 1.5, y: 4.3, font: "Cambria", size: 8.5, bold: true, italic: false, underline: false, align: "left"
+      },
+      {
+        id: "Text-T2", type: "text", sourceType: "col", colName: "Col3", customText: "",
+        x: 1.5, y: 8.0, font: "Arial", size: 6.5, bold: false, italic: false, underline: false, align: "left"
+      }
+    ];
+    let selectedId = "Text-T0";
 
-    for (let i = 0; i < 4; i++) {
-      const div = document.createElement("div");
-      div.className = "row-cfg";
-      div.innerHTML = `
-        <strong>Line ${i + 1}:</strong>
-        <select id="type_${i}">
-          <option value="col" ${i < 3 ? "selected" : ""}>Excel Column</option>
-          <option value="custom">Custom Text</option>
-          <option value="none" ${i === 3 ? "selected" : ""}>None</option>
-        </select>
-        <select id="col_${i}" style="min-width:120px;"></select>
-        <input type="text" id="custom_${i}" placeholder="Custom text" style="width:130px; display:none;" />
-        <select id="font_${i}">
-          ${fonts.map(f => `<option value="${f}">${f}</option>`).join("")}
-        </select>
-        <label>Size(pt): <input type="number" id="size_${i}" value="${defaultSizes[i]}" min="5" max="72" style="width:55px" /></label>
-        <label><input type="checkbox" id="bold_${i}" ${i === 0 ? "checked" : ""} /> Bold</label>
-        <label><input type="checkbox" id="italic_${i}" /> Italic</label>
-      `;
-      rowsConfigEl.appendChild(div);
+    const $ = (id) => document.getElementById(id);
 
-      document.getElementById(`type_${i}`).addEventListener("change", (e) => {
-        const isCustom = e.target.value === "custom";
-        const isCol = e.target.value === "col";
-        document.getElementById(`custom_${i}`).style.display = isCustom ? "inline-block" : "none";
-        document.getElementById(`col_${i}`).style.display = isCol ? "inline-block" : "none";
+    function getPxPerMm() {
+      return parseFloat($("zoomSelect").value) || 10;
+    }
+
+    function getValueForObj(obj, rowObj) {
+      if (obj.sourceType === "custom") return obj.customText || "";
+      if (!rowObj) return "";
+      const val = rowObj[obj.colName];
+      return val !== undefined && val !== null ? String(val) : "";
+    }
+
+    function renderRulers(wMm, hMm, pxPerMm) {
+      const top = $("rulerTop");
+      const left = $("rulerLeft");
+      top.style.width = `${wMm * pxPerMm}px`;
+      left.style.height = `${hMm * pxPerMm}px`;
+      top.innerHTML = "";
+      left.innerHTML = "";
+
+      for (let m = 0; m <= Math.ceil(wMm); m += 2) {
+        const tick = document.createElement("span");
+        tick.style.position = "absolute";
+        tick.style.left = `${m * pxPerMm}px`;
+        tick.style.top = m % 10 === 0 ? "2px" : "11px";
+        tick.style.borderLeft = "1px solid #475569";
+        tick.style.height = m % 10 === 0 ? "19px" : "10px";
+        if (m % 10 === 0) tick.textContent = m;
+        top.appendChild(tick);
+      }
+      for (let m = 0; m <= Math.ceil(hMm); m += 2) {
+        const tick = document.createElement("span");
+        tick.style.position = "absolute";
+        tick.style.top = `${m * pxPerMm}px`;
+        tick.style.left = m % 10 === 0 ? "2px" : "14px";
+        tick.style.borderTop = "1px solid #475569";
+        tick.style.width = m % 10 === 0 ? "23px" : "11px";
+        if (m % 10 === 0) tick.textContent = m;
+        left.appendChild(tick);
+      }
+    }
+
+    function renderElementNode(obj, rowObj, scaleFactor, interactive = false) {
+      const el = document.createElement("div");
+      el.style.position = "absolute";
+      el.style.left = `${obj.x * scaleFactor}px`;
+      el.style.top = `${obj.y * scaleFactor}px`;
+
+      const textVal = getValueForObj(obj, rowObj);
+
+      if (obj.type === "text") {
+        // Convert pt to mm (1pt = 0.352778mm) so preview & print match physical mm
+        const fontPx = obj.size * 0.352778 * scaleFactor;
+        el.style.fontFamily = `'${obj.font}', sans-serif`;
+        el.style.fontSize = `${fontPx}px`;
+        el.style.fontWeight = obj.bold ? "bold" : "normal";
+        el.style.fontStyle = obj.italic ? "italic" : "normal";
+        el.style.textDecoration = obj.underline ? "underline" : "none";
+        el.style.textAlign = obj.align || "left";
+        el.style.whiteSpace = "nowrap";
+        el.style.lineHeight = "1.1";
+        el.textContent = textVal || (interactive ? `[${obj.colName}]` : "");
+      } else if (obj.type === "barcode") {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        const wPx = (obj.codeW || 18) * scaleFactor;
+        const hPx = (obj.codeH || 5) * scaleFactor;
+        svg.style.width = `${wPx}px`;
+        svg.style.height = `${hPx}px`;
+        el.appendChild(svg);
+        try {
+          JsBarcode(svg, textVal || "123456", {
+            format: "CODE128",
+            displayValue: false,
+            margin: 0,
+            width: 1.5,
+            height: hPx
+          });
+        } catch (e) {
+          el.textContent = textVal;
+        }
+      } else if (obj.type === "qr") {
+        const sizePx = Math.round((obj.codeW || 8) * scaleFactor);
+        const qrHolder = document.createElement("div");
+        el.appendChild(qrHolder);
+        try {
+          new QRCode(qrHolder, {
+            text: textVal || "MIV",
+            width: sizePx,
+            height: sizePx,
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (e) {
+          el.textContent = textVal;
+        }
+      }
+
+      if (interactive) {
+        el.className = "design-obj" + (obj.id === selectedId ? " selected" : "");
+        el.dataset.id = obj.id;
+        attachDrag(el, obj);
+      }
+      return el;
+    }
+
+    function attachDrag(el, obj) {
+      el.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        selectedId = obj.id;
+        syncPropertyPanel();
+        renderControlList();
+        document.querySelectorAll(".design-obj").forEach(n => n.classList.remove("selected"));
+        el.classList.add("selected");
+
+        const startMouseX = e.clientX;
+        const startMouseY = e.clientY;
+        const origX = obj.x;
+        const origY = obj.y;
+        const pxPerMm = getPxPerMm();
+
+        function onMove(ev) {
+          const dx = (ev.clientX - startMouseX) / pxPerMm;
+          const dy = (ev.clientY - startMouseY) / pxPerMm;
+          obj.x = Math.max(0, +(origX + dx).toFixed(1));
+          obj.y = Math.max(0, +(origY + dy).toFixed(1));
+          el.style.left = `${obj.x * pxPerMm}px`;
+          el.style.top = `${obj.y * pxPerMm}px`;
+          $("propX").value = obj.x;
+          $("propY").value = obj.y;
+        }
+
+        function onUp() {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+          renderStripPreview();
+        }
+
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
       });
     }
 
-    document.getElementById("excelFile").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const data = new Uint8Array(evt.target.result);
-        workbook = XLSX.read(data, { type: "array" });
-        const sheetSelect = document.getElementById("sheetSelect");
-        sheetSelect.innerHTML = workbook.SheetNames.map(n => `<option value="${n}">${n}</option>`).join("");
-        loadSheet(workbook.SheetNames[0]);
-      };
-      reader.readAsArrayBuffer(file);
-    });
+    function renderCanvas() {
+      const wMm = parseFloat($("lblW").value) || 24.8;
+      const hMm = parseFloat($("lblH").value) || 12.7;
+      const pxPerMm = getPxPerMm();
 
-    document.getElementById("sheetSelect").addEventListener("change", (e) => {
-      loadSheet(e.target.value);
-    });
+      const canvas = $("stickerCanvas");
+      canvas.style.width = `${wMm * pxPerMm}px`;
+      canvas.style.height = `${hMm * pxPerMm}px`;
+      canvas.innerHTML = "";
 
-    function loadSheet(sheetName) {
-      if (!workbook || !sheetName) return;
-      const ws = workbook.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
-      currentRows = json;
-      currentHeaders = json.length ? Object.keys(json[0]) : [];
+      renderRulers(wMm, hMm, pxPerMm);
 
-      for (let i = 0; i < 4; i++) {
-        const sel = document.getElementById(`col_${i}`);
-        sel.innerHTML = currentHeaders.map((h, idx) =>
-          `<option value="${h}" ${idx === i ? "selected" : ""}>${h}</option>`
-        ).join("");
+      const sampleIdx = Math.max(0, Math.min(rowsData.length - 1, (parseInt($("previewRowIdx").value, 10) || 1) - 1));
+      const sampleRow = rowsData[sampleIdx] || {};
+
+      for (const obj of objects) {
+        canvas.appendChild(renderElementNode(obj, sampleRow, pxPerMm, true));
       }
-      document.getElementById("statusText").textContent = `Loaded "${sheetName}" (${currentRows.length} rows)`;
+
+      updateTotalPaperWidth();
+      renderStripPreview();
     }
 
-    function renderStickers() {
-      const area = document.getElementById("previewArea");
-      area.innerHTML = "";
-      if (!currentRows.length) {
-        alert("Please select an Excel file first.");
+    function updateTotalPaperWidth() {
+      const wMm = parseFloat($("lblW").value) || 24.8;
+      const cols = Math.max(1, parseInt($("colsAcross").value, 10) || 4);
+      const mLeft = parseFloat($("marginLeft").value) || 0;
+      const gap = parseFloat($("colGap").value) || 0;
+      const total = (mLeft * 2) + (wMm * cols) + (gap * (cols - 1));
+      $("totalPaperW").textContent = total.toFixed(2);
+    }
+
+    function getTargetBatchRows() {
+      const start = Math.max(1, parseInt($("startRow").value, 10) || 1);
+      const endRaw = parseInt($("endRow").value, 10) || 0;
+      const copies = Math.max(1, parseInt($("copiesPerRow").value, 10) || 1);
+      const slice = rowsData.slice(start - 1, endRaw > 0 ? endRaw : rowsData.length);
+
+      const expanded = [];
+      for (const r of slice) {
+        for (let c = 0; c < copies; c++) {
+          expanded.push(r);
+        }
+      }
+      return expanded;
+    }
+
+    function renderStripPreview() {
+      const container = $("stripPreviewContainer");
+      container.innerHTML = "";
+
+      const wMm = parseFloat($("lblW").value) || 24.8;
+      const hMm = parseFloat($("lblH").value) || 12.7;
+      const cols = Math.max(1, parseInt($("colsAcross").value, 10) || 4);
+      const mLeft = parseFloat($("marginLeft").value) || 0;
+      const gap = parseFloat($("colGap").value) || 0;
+      const fillMode = $("fillMode").value;
+      const previewScale = 5.5; // px per mm for multi-column preview
+
+      const batch = getTargetBatchRows();
+      $("batchSummary").textContent = `4-Across Strip Preview (Total Stickers: ${batch.length})`;
+
+      const chunks = [];
+      if (fillMode === "duplicate") {
+        for (let i = 0; i < Math.min(batch.length, 3); i++) {
+          chunks.push(Array(cols).fill(batch[i]));
+        }
+      } else {
+        for (let i = 0; i < Math.min(batch.length, cols * 3); i += cols) {
+          chunks.push(batch.slice(i, i + cols));
+        }
+      }
+
+      for (const rowChunk of chunks) {
+        const strip = document.createElement("div");
+        strip.className = "roll-row";
+        strip.style.paddingLeft = `${mLeft * previewScale}px`;
+        strip.style.paddingRight = `${mLeft * previewScale}px`;
+
+        for (let c = 0; c < cols; c++) {
+          const cell = document.createElement("div");
+          cell.className = "roll-cell";
+          cell.style.width = `${wMm * previewScale}px`;
+          cell.style.height = `${hMm * previewScale}px`;
+          if (c < cols - 1 && gap > 0) cell.style.marginRight = `${gap * previewScale}px`;
+
+          const itemRow = rowChunk[c];
+          if (itemRow) {
+            for (const obj of objects) {
+              cell.appendChild(renderElementNode(obj, itemRow, previewScale, false));
+            }
+          }
+          strip.appendChild(cell);
+        }
+        container.appendChild(strip);
+      }
+    }
+
+    function renderControlList() {
+      const list = $("controlList");
+      list.innerHTML = "";
+      for (const obj of objects) {
+        const div = document.createElement("div");
+        div.className = "obj-list-item" + (obj.id === selectedId ? " active" : "");
+        const label = obj.sourceType === "custom" ? `"${obj.customText}"` : `[${obj.colName}]`;
+        div.innerHTML = `<span>${obj.id}</span><span>${label}</span>`;
+        div.addEventListener("click", () => {
+          selectedId = obj.id;
+          syncPropertyPanel();
+          renderControlList();
+          renderCanvas();
+        });
+        list.appendChild(div);
+      }
+    }
+
+    function syncPropertyPanel() {
+      const obj = objects.find(o => o.id === selectedId);
+      if (!obj) {
+        $("noSelectionMsg").style.display = "block";
+        $("propForm").style.display = "none";
         return;
       }
+      $("noSelectionMsg").style.display = "none";
+      $("propForm").style.display = "block";
 
-      const wMm = parseFloat(document.getElementById("stickerW").value) || 50.8;
-      const hMm = parseFloat(document.getElementById("stickerH").value) || 25.4;
-      const copies = Math.max(1, parseInt(document.getElementById("copies").value, 10) || 1);
+      $("propSourceType").value = obj.sourceType;
+      $("propColRow").style.display = obj.sourceType === "col" ? "flex" : "none";
+      $("propCustomRow").style.display = obj.sourceType === "custom" ? "flex" : "none";
 
-      let total = 0;
-      for (const row of currentRows) {
-        const linesHtml = [];
-        let hasContent = false;
+      $("propColSelect").innerHTML = columnNames
+        .map(c => `<option value="${c}" ${c === obj.colName ? "selected" : ""}>${c}</option>`)
+        .join("");
+      $("propCustomText").value = obj.customText || "";
+      $("propX").value = obj.x;
+      $("propY").value = obj.y;
 
-        for (let i = 0; i < 4; i++) {
-          const type = document.getElementById(`type_${i}`).value;
-          if (type === "none") continue;
+      if (obj.type === "text") {
+        $("textOnlyProps").style.display = "block";
+        $("codeOnlyProps").style.display = "none";
+        $("propFont").value = obj.font;
+        $("propSize").value = obj.size;
+        $("propAlign").value = obj.align || "left";
+        $("propBold").checked = !!obj.bold;
+        $("propItalic").checked = !!obj.italic;
+        $("propUnderline").checked = !!obj.underline;
+      } else {
+        $("textOnlyProps").style.display = "none";
+        $("codeOnlyProps").style.display = "block";
+        $("propCodeW").value = obj.codeW || 16;
+        $("propCodeH").value = obj.codeH || 5;
+      }
+    }
 
-          let text = "";
-          if (type === "custom") {
-            text = document.getElementById(`custom_${i}`).value;
-          } else {
-            const colName = document.getElementById(`col_${i}`).value;
-            text = row[colName] !== undefined ? String(row[colName]) : "";
-          }
-          if (text.trim() !== "") hasContent = true;
+    function bindPropEvents() {
+      const updateSelected = () => {
+        const obj = objects.find(o => o.id === selectedId);
+        if (!obj) return;
+        obj.sourceType = $("propSourceType").value;
+        obj.colName = $("propColSelect").value;
+        obj.customText = $("propCustomText").value;
+        obj.x = parseFloat($("propX").value) || 0;
+        obj.y = parseFloat($("propY").value) || 0;
 
-          const font = document.getElementById(`font_${i}`).value;
-          const size = parseInt(document.getElementById(`size_${i}`).value, 10) || 10;
-          const bold = document.getElementById(`bold_${i}`).checked ? "bold" : "normal";
-          const italic = document.getElementById(`italic_${i}`).checked ? "italic" : "normal";
-
-          linesHtml.push(
-            `<div class="sticker-line" style="font-family:'${font}',sans-serif;font-size:${size}pt;font-weight:${bold};font-style:${italic};">${escapeHtml(text)}</div>`
-          );
+        if (obj.type === "text") {
+          obj.font = $("propFont").value;
+          obj.size = parseFloat($("propSize").value) || 8;
+          obj.align = $("propAlign").value;
+          obj.bold = $("propBold").checked;
+          obj.italic = $("propItalic").checked;
+          obj.underline = $("propUnderline").checked;
+        } else {
+          obj.codeW = parseFloat($("propCodeW").value) || 16;
+          obj.codeH = parseFloat($("propCodeH").value) || 5;
         }
+        syncPropertyPanel();
+        renderControlList();
+        renderCanvas();
+      };
 
-        if (!hasContent) continue;
+      [
+        "propSourceType", "propColSelect", "propCustomText",
+        "propX", "propY", "propFont", "propSize", "propAlign",
+        "propBold", "propItalic", "propUnderline", "propCodeW", "propCodeH"
+      ].forEach(id => {
+        $(id).addEventListener("input", updateSelected);
+        $(id).addEventListener("change", updateSelected);
+      });
+    }
 
-        for (let c = 0; c < copies; c++) {
-          const sticker = document.createElement("div");
-          sticker.className = "sticker";
-          sticker.style.width = `${wMm}mm`;
-          sticker.style.height = `${hMm}mm`;
-          sticker.innerHTML = linesHtml.join("");
-          area.appendChild(sticker);
-          total++;
+    // Excel Parsing (Respects "First Row Is Column Name" like WagLabel)
+    function parseActiveSheet() {
+      if (!workbook) return;
+      const sheetName = $("sheetSelect").value;
+      const ws = workbook.Sheets[sheetName];
+      const rawMatrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const nonEmpty = rawMatrix.filter(r => r.some(cell => String(cell).trim() !== ""));
+      if (!nonEmpty.length) return;
+
+      const hasHeader = $("hasHeaderChk").checked;
+      if (hasHeader) {
+        columnNames = nonEmpty[0].map((h, i) => String(h).trim() || `Col${i + 1}`);
+        rowsData = nonEmpty.slice(1).map(r => {
+          const obj = {};
+          columnNames.forEach((c, i) => { obj[c] = r[i] !== undefined ? r[i] : ""; });
+          return obj;
+        });
+      } else {
+        const maxCols = Math.max(...nonEmpty.map(r => r.length));
+        columnNames = Array.from({ length: maxCols }, (_, i) => `Col${i + 1}`);
+        rowsData = nonEmpty.map(r => {
+          const obj = {};
+          columnNames.forEach((c, i) => { obj[c] = r[i] !== undefined ? r[i] : ""; });
+          return obj;
+        });
+      }
+
+      // Auto-map existing objects to available columns if needed
+      objects.forEach((o, idx) => {
+        if (!columnNames.includes(o.colName) && columnNames[idx]) {
+          o.colName = columnNames[idx];
+        }
+      });
+
+      $("excelStatus").textContent = `Sheet "${sheetName}": ${rowsData.length} rows | Columns: ${columnNames.join(", ")}`;
+      syncPropertyPanel();
+      renderControlList();
+      renderCanvas();
+    }
+
+    $("excelFile").addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        workbook = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
+        $("sheetSelect").innerHTML = workbook.SheetNames
+          .map(s => `<option value="${s}">${s}</option>`)
+          .join("");
+        parseActiveSheet();
+      };
+      reader.readAsArrayBuffer(f);
+    });
+
+    $("sheetSelect").addEventListener("change", parseActiveSheet);
+    $("hasHeaderChk").addEventListener("change", parseActiveSheet);
+
+    // Preset & Dimension listeners
+    $("presetSelect").addEventListener("change", (e) => {
+      const [w, h, c, ml, mr, gap] = e.target.value.split(",").map(Number);
+      $("lblW").value = w;
+      $("lblH").value = h;
+      $("colsAcross").value = c;
+      $("marginLeft").value = ml;
+      $("colGap").value = gap;
+      renderCanvas();
+    });
+
+    ["lblW", "lblH", "colsAcross", "marginLeft", "colGap", "zoomSelect", "previewRowIdx", "startRow", "endRow", "copiesPerRow", "fillMode"].forEach(id => {
+      $(id).addEventListener("input", renderCanvas);
+      $(id).addEventListener("change", renderCanvas);
+    });
+
+    // Add / Delete Objects
+    $("btnAddText").addEventListener("click", () => {
+      const idx = objects.length;
+      const newObj = {
+        id: `Text-T${idx}`,
+        type: "text",
+        sourceType: "col",
+        colName: columnNames[Math.min(idx, columnNames.length - 1)] || "Col1",
+        customText: "Text",
+        x: 1.5,
+        y: Math.min(9, idx * 3),
+        font: "Arial",
+        size: 8,
+        bold: false,
+        italic: false,
+        underline: false,
+        align: "left"
+      };
+      objects.push(newObj);
+      selectedId = newObj.id;
+      syncPropertyPanel();
+      renderControlList();
+      renderCanvas();
+    });
+
+    $("btnAddBarcode").addEventListener("click", () => {
+      const newObj = {
+        id: `Barcode-B${objects.length}`,
+        type: "barcode",
+        sourceType: "col",
+        colName: columnNames[0] || "Col1",
+        customText: "12345",
+        x: 1.5,
+        y: 6.5,
+        codeW: 18,
+        codeH: 4.5
+      };
+      objects.push(newObj);
+      selectedId = newObj.id;
+      syncPropertyPanel();
+      renderControlList();
+      renderCanvas();
+    });
+
+    $("btnAddQR").addEventListener("click", () => {
+      const newObj = {
+        id: `QR-Q${objects.length}`,
+        type: "qr",
+        sourceType: "col",
+        colName: columnNames[0] || "Col1",
+        customText: "MIV",
+        x: 15.5,
+        y: 2.0,
+        codeW: 7.5,
+        codeH: 7.5
+      };
+      objects.push(newObj);
+      selectedId = newObj.id;
+      syncPropertyPanel();
+      renderControlList();
+      renderCanvas();
+    });
+
+    $("btnDeleteObj").addEventListener("click", () => {
+      if (!selectedId) return;
+      objects = objects.filter(o => o.id !== selectedId);
+      selectedId = objects.length ? objects[0].id : null;
+      syncPropertyPanel();
+      renderControlList();
+      renderCanvas();
+    });
+
+    // Save / Load Layout JSON
+    $("btnSaveTpl").addEventListener("click", () => {
+      const payload = {
+        lblW: $("lblW").value,
+        lblH: $("lblH").value,
+        colsAcross: $("colsAcross").value,
+        marginLeft: $("marginLeft").value,
+        colGap: $("colGap").value,
+        objects
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sato-sticker-layout.json";
+      a.click();
+    });
+
+    $("btnLoadTpl").addEventListener("click", () => $("tplFileInput").click());
+    $("tplFileInput").addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const data = JSON.parse(ev.target.result);
+        $("lblW").value = data.lblW || 24.8;
+        $("lblH").value = data.lblH || 12.7;
+        $("colsAcross").value = data.colsAcross || 4;
+        $("marginLeft").value = data.marginLeft || 1.0;
+        $("colGap").value = data.colGap || 0;
+        objects = data.objects || [];
+        selectedId = objects.length ? objects[0].id : null;
+        syncPropertyPanel();
+        renderControlList();
+        renderCanvas();
+      };
+      reader.readAsText(f);
+    });
+
+    // Build Physical MM Print Output (4-Across Rows)
+    function buildPrintPages() {
+      const out = $("printOutput");
+      out.innerHTML = "";
+
+      const wMm = parseFloat($("lblW").value) || 24.8;
+      const hMm = parseFloat($("lblH").value) || 12.7;
+      const cols = Math.max(1, parseInt($("colsAcross").value, 10) || 4);
+      const mLeft = parseFloat($("marginLeft").value) || 0;
+      const gap = parseFloat($("colGap").value) || 0;
+      const fillMode = $("fillMode").value;
+      const totalW = (mLeft * 2) + (wMm * cols) + (gap * (cols - 1));
+
+      // Inject dynamic @page rule matching exact strip size
+      let pageStyle = document.getElementById("dynamicPageStyle");
+      if (!pageStyle) {
+        pageStyle = document.createElement("style");
+        pageStyle.id = "dynamicPageStyle";
+        document.head.appendChild(pageStyle);
+      }
+      pageStyle.textContent = `@media print { @page { size: ${totalW}mm ${hMm}mm; margin: 0; } }`;
+
+      const batch = getTargetBatchRows();
+      const chunks = [];
+      if (fillMode === "duplicate") {
+        for (const r of batch) chunks.push(Array(cols).fill(r));
+      } else {
+        for (let i = 0; i < batch.length; i += cols) {
+          chunks.push(batch.slice(i, i + cols));
         }
       }
 
-      document.getElementById("statusText").textContent = `Generated ${total} sticker(s).`;
+      // 1 mm = 3.7795275591 px at 96 DPI CSS reference pixel
+      const cssPxPerMm = 3.7795275591;
+
+      for (const rowChunk of chunks) {
+        const printRow = document.createElement("div");
+        printRow.className = "print-row";
+        printRow.style.width = `${totalW}mm`;
+        printRow.style.height = `${hMm}mm`;
+        printRow.style.paddingLeft = `${mLeft}mm`;
+        printRow.style.paddingRight = `${mLeft}mm`;
+
+        for (let c = 0; c < cols; c++) {
+          const sticker = document.createElement("div");
+          sticker.className = "print-sticker";
+          sticker.style.width = `${wMm}mm`;
+          sticker.style.height = `${hMm}mm`;
+          if (c < cols - 1 && gap > 0) sticker.style.marginRight = `${gap}mm`;
+
+          const itemRow = rowChunk[c];
+          if (itemRow) {
+            for (const obj of objects) {
+              sticker.appendChild(renderElementNode(obj, itemRow, cssPxPerMm, false));
+            }
+          }
+          printRow.appendChild(sticker);
+        }
+        out.appendChild(printRow);
+      }
     }
 
-    function escapeHtml(str) {
-      return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
-
-    document.getElementById("btnRender").addEventListener("click", renderStickers);
-    document.getElementById("btnPrint").addEventListener("click", () => {
-      renderStickers();
+    $("btnPreviewBatch").addEventListener("click", renderStripPreview);
+    $("btnPrintBatch").addEventListener("click", () => {
+      buildPrintPages();
       window.print();
     });
+
+    bindPropEvents();
+    syncPropertyPanel();
+    renderControlList();
+    renderCanvas();
   </script>
 </body>
 </html>
