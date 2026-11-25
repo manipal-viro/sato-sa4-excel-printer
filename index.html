@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SATO SA4 WagLabel-Style Visual Designer (PWA)</title>
+  <title>SATO SA4 Studio — WagLabel-Style Visual Designer</title>
   <link rel="manifest" href="manifest.json" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -25,7 +25,7 @@
       font-size: 13px;
     }
 
-    /* Top Ribbon Toolbar (WagLabel style) */
+    /* Top Ribbon Toolbar */
     .toolbar {
       background: #f8fafc;
       border-bottom: 1px solid var(--border);
@@ -66,7 +66,7 @@
     /* 3-Column Workspace */
     .workspace {
       display: grid;
-      grid-template-columns: 270px 1fr 290px;
+      grid-template-columns: 280px 1fr 295px;
       gap: 10px;
       padding: 10px;
       min-height: calc(100vh - 52px);
@@ -99,7 +99,7 @@
       background: #cbd5e1;
       border: 1px solid #94a3b8;
       border-radius: 6px;
-      padding: 20px;
+      padding: 18px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -143,17 +143,17 @@
       position: absolute;
       cursor: move;
       border: 1px dashed transparent;
-      padding: 1px 2px;
+      padding: 0 2px;
       white-space: nowrap;
       line-height: 1.15;
     }
     .design-obj:hover { border-color: #93c5fd; }
     .design-obj.selected {
       border: 1px dashed #2563eb;
-      background: rgba(37, 99, 235, 0.06);
+      background: rgba(37, 99, 235, 0.08);
     }
 
-    /* 4-Across Roll Strip Preview */
+    /* Inline 4-Across Roll Strip Preview */
     .strip-preview-box {
       margin-top: 14px;
       width: 100%;
@@ -161,6 +161,7 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 10px;
+      overflow-x: auto;
     }
     .roll-row {
       display: flex;
@@ -175,6 +176,7 @@
       border-right: 1px dashed #94a3b8;
       overflow: hidden;
       background: #fff;
+      flex-shrink: 0;
     }
     .roll-cell:last-child { border-right: none; }
 
@@ -195,12 +197,64 @@
       font-weight: 600;
     }
 
+    /* Full Batch Preview Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 8px;
+      width: 92%;
+      max-width: 960px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+      border-radius: 8px 8px 0 0;
+    }
+    .modal-body {
+      padding: 16px;
+      overflow: auto;
+      background: #e2e8f0;
+      flex: 1;
+    }
+    .modal-strip-wrap {
+      margin-bottom: 12px;
+      background: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+      width: fit-content;
+    }
+    .modal-strip-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+
     /* Print Styles for 4-Across Thermal Roll */
     #printOutput { display: none; }
     @media print {
       @page { margin: 0; }
-      body { background: #fff; margin: 0; padding: 0; }
-      .no-print { display: none !important; }
+      html, body { background: #fff; margin: 0 !important; padding: 0 !important; }
+      .no-print, .modal-backdrop { display: none !important; }
       #printOutput {
         display: block !important;
         margin: 0;
@@ -213,11 +267,13 @@
         page-break-after: always;
         break-after: page;
         overflow: hidden;
+        box-sizing: border-box;
       }
       .print-sticker {
         position: relative;
         overflow: hidden;
         box-sizing: border-box;
+        flex-shrink: 0;
       }
     }
   </style>
@@ -236,7 +292,7 @@
       <button id="btnDeleteObj" class="danger">Delete Selected</button>
     </div>
     <div class="toolbar-group">
-      <button id="btnSaveTpl">Save Layout (.json)</button>
+      <button id="btnSaveTpl">Save Layout</button>
       <button id="btnLoadTpl">Load Layout</button>
       <input type="file" id="tplFileInput" accept=".json" style="display:none" />
     </div>
@@ -265,26 +321,26 @@
         <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="width:100%; margin-bottom:6px;" />
         <div class="field-row">
           <label>Sheet:</label>
-          <select id="sheetSelect" style="width:150px;"></select>
+          <select id="sheetSelect" style="width:155px;"></select>
         </div>
         <div class="field-row">
           <label><input type="checkbox" id="hasHeaderChk" /> First Row Is Column Name</label>
         </div>
         <div class="field-row">
-          <label>Sample Row #:</label>
+          <label>Preview Row #:</label>
           <input type="number" id="previewRowIdx" value="1" min="1" style="width:70px;" />
         </div>
-        <div id="excelStatus" style="font-size:11px; color:#475569;">No Excel loaded (using sample data).</div>
+        <div id="excelStatus" style="font-size:11px; color:#475569;">Sample data loaded (4 rows).</div>
       </div>
 
       <div class="card">
         <h3>2. Label & 4-Across Roll Size</h3>
         <div class="field-row">
           <label>Preset:</label>
-          <select id="presetSelect" style="width:155px;">
-            <option value="24.8,12.7,4,1,1,0">24.8×12.7mm (4-Across)</option>
-            <option value="25,15,4,0.8,0.8,0">25×15mm OMX (4-Across)</option>
-            <option value="50.8,25.4,1,0,0,0">50.8×25.4mm (1-Across)</option>
+          <select id="presetSelect" style="width:160px;">
+            <option value="24.8,12.7,4,1,0">24.8×12.7mm (4-Across)</option>
+            <option value="25,15,4,0.8,0">25×15mm OMX (4-Across)</option>
+            <option value="50.8,25.4,1,0,0">50.8×25.4mm (1-Across)</option>
           </select>
         </div>
         <div class="field-row">
@@ -300,7 +356,7 @@
           <input type="number" id="colsAcross" value="4" min="1" max="8" style="width:75px;" />
         </div>
         <div class="field-row">
-          <label>Left Margin (mm):</label>
+          <label>Left/Right Margin (mm):</label>
           <input type="number" id="marginLeft" value="1.0" step="0.1" style="width:75px;" />
         </div>
         <div class="field-row">
@@ -310,25 +366,37 @@
       </div>
 
       <div class="card">
-        <h3>3. Continuous Print Range</h3>
+        <h3>3. Print Settings (WagLabel Style)</h3>
         <div class="field-row">
-          <label>Start Row:</label>
-          <input type="number" id="startRow" value="1" min="1" style="width:75px;" />
+          <label>
+            <input type="radio" name="rowMode" value="all" checked /> All Rows
+          </label>
+          <label>
+            <input type="radio" name="rowMode" value="custom" /> Custom Rows
+          </label>
         </div>
         <div class="field-row">
-          <label>End Row (0 = All):</label>
-          <input type="number" id="endRow" value="0" min="0" style="width:75px;" />
+          <label>Rows (e.g. 1 or 2,4,5-8):</label>
+          <input type="text" id="customRowsSpec" value="1-10" disabled style="width:115px;" />
         </div>
         <div class="field-row">
-          <label>Copies per Row:</label>
+          <label>Print Copies:</label>
           <input type="number" id="copiesPerRow" value="1" min="1" style="width:75px;" />
         </div>
         <div class="field-row">
           <label>Fill Mode:</label>
-          <select id="fillMode" style="width:145px;">
+          <select id="fillMode" style="width:155px;">
             <option value="sequential">1 Row per Sticker (1,2,3,4)</option>
             <option value="duplicate">Repeat Same Row Across 4</option>
           </select>
+        </div>
+        <div class="field-row">
+          <label>Position Adjust Left (mm):</label>
+          <input type="number" id="offsetLeft" value="0" step="0.2" style="width:70px;" />
+        </div>
+        <div class="field-row">
+          <label>Position Adjust Top (mm):</label>
+          <input type="number" id="offsetTop" value="0" step="0.2" style="width:70px;" />
         </div>
       </div>
     </div>
@@ -336,7 +404,7 @@
     <!-- CENTER PANEL: VISUAL LABEL DESIGNER + 4-ACROSS PREVIEW -->
     <div class="canvas-stage">
       <div style="margin-bottom:8px; font-weight:600; color:#1e293b;">
-        Single Sticker Designer — Drag items or edit properties on the right
+        Single Sticker Designer — Drag items or use Center/Left/Right alignment on the right
       </div>
       <div class="ruler-wrap" id="rulerWrap">
         <div class="ruler-top" id="rulerTop"></div>
@@ -346,8 +414,8 @@
 
       <div class="strip-preview-box">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <strong id="batchSummary">4-Across Strip Preview (First 3 Rows)</strong>
-          <span style="font-size:11px; color:#475569;">Paper width: <span id="totalPaperW">101.2</span> mm</span>
+          <strong id="batchSummary">4-Across Strip Preview (First 3 Strips)</strong>
+          <span style="font-size:11px; color:#475569;">Paper width: <span id="totalPaperW">101.20</span> mm</span>
         </div>
         <div id="stripPreviewContainer"></div>
       </div>
@@ -361,18 +429,18 @@
         <div id="propForm" style="display:none;">
           <div class="field-row">
             <label>Source:</label>
-            <select id="propSourceType" style="width:155px;">
+            <select id="propSourceType" style="width:160px;">
               <option value="col">Excel Column</option>
               <option value="custom">Custom Text</option>
             </select>
           </div>
           <div class="field-row" id="propColRow">
             <label>Column:</label>
-            <select id="propColSelect" style="width:155px;"></select>
+            <select id="propColSelect" style="width:160px;"></select>
           </div>
           <div class="field-row" id="propCustomRow" style="display:none;">
             <label>Text:</label>
-            <input type="text" id="propCustomText" style="width:155px;" />
+            <input type="text" id="propCustomText" style="width:160px;" />
           </div>
           <div class="field-row">
             <label>X (mm):</label>
@@ -383,7 +451,7 @@
           <div id="textOnlyProps">
             <div class="field-row">
               <label>Font:</label>
-              <select id="propFont" style="width:155px;">
+              <select id="propFont" style="width:160px;">
                 <option value="Arial">Arial</option>
                 <option value="Cambria">Cambria</option>
                 <option value="Calibri">Calibri</option>
@@ -397,7 +465,7 @@
               <label>Size (pt):</label>
               <input type="number" id="propSize" min="4" max="72" step="0.5" style="width:70px;" />
               <label>Align:</label>
-              <select id="propAlign" style="width:80px;">
+              <select id="propAlign" style="width:85px;">
                 <option value="left">Left</option>
                 <option value="center">Center</option>
                 <option value="right">Right</option>
@@ -408,6 +476,9 @@
               <label><input type="checkbox" id="propItalic" /> Italic</label>
               <label><input type="checkbox" id="propUnderline" /> Underline</label>
             </div>
+            <div class="field-row" style="margin-top:8px;">
+              <button type="button" id="btnCenterObj" style="width:100%;">Center Selected on Sticker</button>
+            </div>
           </div>
           <div id="codeOnlyProps" style="display:none;">
             <div class="field-row">
@@ -415,6 +486,9 @@
               <input type="number" id="propCodeW" min="4" max="80" step="0.5" style="width:70px;" />
               <label>Height (mm):</label>
               <input type="number" id="propCodeH" min="3" max="50" step="0.5" style="width:70px;" />
+            </div>
+            <div class="field-row">
+              <button type="button" id="btnCenterCode" style="width:100%;">Center Barcode/QR Horizontally</button>
             </div>
           </div>
         </div>
@@ -428,6 +502,23 @@
 
   </div>
 
+  <!-- FULL BATCH PREVIEW MODAL -->
+  <div class="modal-backdrop" id="batchModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <strong id="modalTitle">Batch Preview (4-Across Strips)</strong>
+          <span id="modalSubtitle" style="margin-left:10px; font-size:12px; color:#475569;"></span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="btnModalPrint" class="primary">Print Now</button>
+          <button id="btnCloseModal">Close</button>
+        </div>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
   <!-- HIDDEN PRINT SHEET -->
   <div id="printOutput"></div>
 
@@ -436,7 +527,6 @@
       navigator.serviceWorker.register("sw.js").catch(() => {});
     }
 
-    // Default sample rows matching user's Autoclave Stickers structure
     let workbook = null;
     let rowsData = [
       { Col1: "MIV", Col2: "Y.B. 1701", Col3: "Serum, 200ul", Col4: "Batch A" },
@@ -446,19 +536,18 @@
     ];
     let columnNames = ["Col1", "Col2", "Col3", "Col4"];
 
-    // Up to 4 customizable rows pre-placed for 24.8 x 12.7 mm sticker
     let objects = [
       {
         id: "Text-T0", type: "text", sourceType: "col", colName: "Col1", customText: "MIV",
-        x: 1.5, y: 0.6, font: "Cambria", size: 8.5, bold: true, italic: false, underline: false, align: "left"
+        x: 0, y: 0.8, font: "Cambria", size: 8.5, bold: true, italic: false, underline: false, align: "center"
       },
       {
         id: "Text-T1", type: "text", sourceType: "col", colName: "Col2", customText: "Y.B. 1701",
-        x: 1.5, y: 4.3, font: "Cambria", size: 8.5, bold: true, italic: false, underline: false, align: "left"
+        x: 0, y: 4.8, font: "Cambria", size: 8.5, bold: true, italic: false, underline: false, align: "center"
       },
       {
         id: "Text-T2", type: "text", sourceType: "col", colName: "Col3", customText: "",
-        x: 1.5, y: 8.0, font: "Arial", size: 6.5, bold: false, italic: false, underline: false, align: "left"
+        x: 0, y: 8.8, font: "Arial", size: 6.5, bold: false, italic: false, underline: false, align: "center"
       }
     ];
     let selectedId = "Text-T0";
@@ -474,6 +563,53 @@
       if (!rowObj) return "";
       const val = rowObj[obj.colName];
       return val !== undefined && val !== null ? String(val) : "";
+    }
+
+    // Parse WagLabel style custom row expression: e.g. "1" or "2,4,5-8"
+    function parseCustomRowSpec(spec, maxRows) {
+      const indices = [];
+      const parts = String(spec || "").split(",");
+      for (const rawPart of parts) {
+        const part = rawPart.trim();
+        if (!part) continue;
+        if (part.includes("-")) {
+          const [aStr, bStr] = part.split("-");
+          const a = parseInt(aStr, 10);
+          const b = parseInt(bStr, 10);
+          if (!isNaN(a) && !isNaN(b)) {
+            const start = Math.max(1, Math.min(a, b));
+            const end = Math.min(maxRows, Math.max(a, b));
+            for (let i = start; i <= end; i++) indices.push(i - 1);
+          }
+        } else {
+          const single = parseInt(part, 10);
+          if (!isNaN(single) && single >= 1 && single <= maxRows) {
+            indices.push(single - 1);
+          }
+        }
+      }
+      return indices;
+    }
+
+    function getTargetBatchRows() {
+      const mode = document.querySelector('input[name="rowMode"]:checked').value;
+      const copies = Math.max(1, parseInt($("copiesPerRow").value, 10) || 1);
+      let baseRows = [];
+
+      if (mode === "custom") {
+        const idxs = parseCustomRowSpec($("customRowsSpec").value, rowsData.length);
+        baseRows = idxs.map(i => rowsData[i]);
+      } else {
+        baseRows = rowsData.slice();
+      }
+
+      const expanded = [];
+      for (const r of baseRows) {
+        for (let c = 0; c < copies; c++) {
+          expanded.push(r);
+        }
+      }
+      return expanded;
     }
 
     function renderRulers(wMm, hMm, pxPerMm) {
@@ -507,26 +643,41 @@
     }
 
     function renderElementNode(obj, rowObj, scaleFactor, interactive = false) {
+      const wMm = parseFloat($("lblW").value) || 24.8;
       const el = document.createElement("div");
       el.style.position = "absolute";
-      el.style.left = `${obj.x * scaleFactor}px`;
       el.style.top = `${obj.y * scaleFactor}px`;
 
       const textVal = getValueForObj(obj, rowObj);
 
       if (obj.type === "text") {
-        // Convert pt to mm (1pt = 0.352778mm) so preview & print match physical mm
+        const align = obj.align || "left";
+        // Give text elements a full printable box width so Left / Center / Right alignment works accurately
+        if (align === "center") {
+          el.style.left = "0px";
+          el.style.width = `${wMm * scaleFactor}px`;
+          el.style.textAlign = "center";
+        } else if (align === "right") {
+          el.style.left = "0px";
+          el.style.width = `${Math.max(2, wMm - (obj.x || 0)) * scaleFactor}px`;
+          el.style.textAlign = "right";
+        } else {
+          el.style.left = `${(obj.x || 0) * scaleFactor}px`;
+          el.style.width = `${Math.max(2, wMm - (obj.x || 0)) * scaleFactor}px`;
+          el.style.textAlign = "left";
+        }
+
         const fontPx = obj.size * 0.352778 * scaleFactor;
         el.style.fontFamily = `'${obj.font}', sans-serif`;
         el.style.fontSize = `${fontPx}px`;
         el.style.fontWeight = obj.bold ? "bold" : "normal";
         el.style.fontStyle = obj.italic ? "italic" : "normal";
         el.style.textDecoration = obj.underline ? "underline" : "none";
-        el.style.textAlign = obj.align || "left";
         el.style.whiteSpace = "nowrap";
         el.style.lineHeight = "1.1";
         el.textContent = textVal || (interactive ? `[${obj.colName}]` : "");
       } else if (obj.type === "barcode") {
+        el.style.left = `${(obj.x || 0) * scaleFactor}px`;
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         const wPx = (obj.codeW || 18) * scaleFactor;
         const hPx = (obj.codeH || 5) * scaleFactor;
@@ -545,6 +696,7 @@
           el.textContent = textVal;
         }
       } else if (obj.type === "qr") {
+        el.style.left = `${(obj.x || 0) * scaleFactor}px`;
         const sizePx = Math.round((obj.codeW || 8) * scaleFactor);
         const qrHolder = document.createElement("div");
         el.appendChild(qrHolder);
@@ -586,12 +738,15 @@
         function onMove(ev) {
           const dx = (ev.clientX - startMouseX) / pxPerMm;
           const dy = (ev.clientY - startMouseY) / pxPerMm;
-          obj.x = Math.max(0, +(origX + dx).toFixed(1));
           obj.y = Math.max(0, +(origY + dy).toFixed(1));
-          el.style.left = `${obj.x * pxPerMm}px`;
           el.style.top = `${obj.y * pxPerMm}px`;
-          $("propX").value = obj.x;
           $("propY").value = obj.y;
+
+          if (obj.type !== "text" || (obj.align || "left") === "left") {
+            obj.x = Math.max(0, +(origX + dx).toFixed(1));
+            el.style.left = `${obj.x * pxPerMm}px`;
+            $("propX").value = obj.x;
+          }
         }
 
         function onUp() {
@@ -637,70 +792,111 @@
       $("totalPaperW").textContent = total.toFixed(2);
     }
 
-    function getTargetBatchRows() {
-      const start = Math.max(1, parseInt($("startRow").value, 10) || 1);
-      const endRaw = parseInt($("endRow").value, 10) || 0;
-      const copies = Math.max(1, parseInt($("copiesPerRow").value, 10) || 1);
-      const slice = rowsData.slice(start - 1, endRaw > 0 ? endRaw : rowsData.length);
-
-      const expanded = [];
-      for (const r of slice) {
-        for (let c = 0; c < copies; c++) {
-          expanded.push(r);
+    function buildChunks(batch, cols, fillMode) {
+      const chunks = [];
+      if (fillMode === "duplicate") {
+        for (const r of batch) chunks.push(Array(cols).fill(r));
+      } else {
+        for (let i = 0; i < batch.length; i += cols) {
+          chunks.push(batch.slice(i, i + cols));
         }
       }
-      return expanded;
+      return chunks;
+    }
+
+    function createStripDom(rowChunk, scaleFactor, isPrint = false) {
+      const wMm = parseFloat($("lblW").value) || 24.8;
+      const hMm = parseFloat($("lblH").value) || 12.7;
+      const cols = Math.max(1, parseInt($("colsAcross").value, 10) || 4);
+      const mLeft = parseFloat($("marginLeft").value) || 0;
+      const gap = parseFloat($("colGap").value) || 0;
+      const offL = parseFloat($("offsetLeft").value) || 0;
+      const offT = parseFloat($("offsetTop").value) || 0;
+      const totalW = (mLeft * 2) + (wMm * cols) + (gap * (cols - 1));
+
+      const strip = document.createElement("div");
+      strip.className = isPrint ? "print-row" : "roll-row";
+
+      if (isPrint) {
+        strip.style.width = `${totalW}mm`;
+        strip.style.height = `${hMm}mm`;
+        strip.style.paddingLeft = `${Math.max(0, mLeft + offL)}mm`;
+        strip.style.paddingRight = `${mLeft}mm`;
+        strip.style.paddingTop = `${Math.max(0, offT)}mm`;
+      } else {
+        strip.style.paddingLeft = `${mLeft * scaleFactor}px`;
+        strip.style.paddingRight = `${mLeft * scaleFactor}px`;
+      }
+
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement("div");
+        cell.className = isPrint ? "print-sticker" : "roll-cell";
+        if (isPrint) {
+          cell.style.width = `${wMm}mm`;
+          cell.style.height = `${hMm}mm`;
+          if (c < cols - 1 && gap > 0) cell.style.marginRight = `${gap}mm`;
+        } else {
+          cell.style.width = `${wMm * scaleFactor}px`;
+          cell.style.height = `${hMm * scaleFactor}px`;
+          if (c < cols - 1 && gap > 0) cell.style.marginRight = `${gap * scaleFactor}px`;
+        }
+
+        const itemRow = rowChunk[c];
+        if (itemRow) {
+          for (const obj of objects) {
+            cell.appendChild(renderElementNode(obj, itemRow, scaleFactor, false));
+          }
+        }
+        strip.appendChild(cell);
+      }
+      return strip;
     }
 
     function renderStripPreview() {
       const container = $("stripPreviewContainer");
       container.innerHTML = "";
 
-      const wMm = parseFloat($("lblW").value) || 24.8;
-      const hMm = parseFloat($("lblH").value) || 12.7;
       const cols = Math.max(1, parseInt($("colsAcross").value, 10) || 4);
-      const mLeft = parseFloat($("marginLeft").value) || 0;
-      const gap = parseFloat($("colGap").value) || 0;
       const fillMode = $("fillMode").value;
-      const previewScale = 5.5; // px per mm for multi-column preview
-
       const batch = getTargetBatchRows();
-      $("batchSummary").textContent = `4-Across Strip Preview (Total Stickers: ${batch.length})`;
+      const chunks = buildChunks(batch, cols, fillMode);
 
-      const chunks = [];
-      if (fillMode === "duplicate") {
-        for (let i = 0; i < Math.min(batch.length, 3); i++) {
-          chunks.push(Array(cols).fill(batch[i]));
-        }
+      $("batchSummary").textContent = `4-Across Strip Preview (${batch.length} stickers across ${chunks.length} strip(s))`;
+
+      for (const rowChunk of chunks.slice(0, 3)) {
+        container.appendChild(createStripDom(rowChunk, 5.5, false));
+      }
+    }
+
+    function openBatchModal() {
+      const modal = $("batchModal");
+      const body = $("modalBody");
+      body.innerHTML = "";
+
+      const cols = Math.max(1, parseInt($("colsAcross").value, 10) || 4);
+      const fillMode = $("fillMode").value;
+      const batch = getTargetBatchRows();
+      const chunks = buildChunks(batch, cols, fillMode);
+
+      $("modalTitle").textContent = `Batch Preview — ${chunks.length} Strip(s) (${batch.length} Stickers)`;
+      $("modalSubtitle").textContent = `4-across layout (${$("lblW").value}mm × ${$("lblH").value}mm per sticker)`;
+
+      if (!chunks.length) {
+        body.innerHTML = "<p>No rows selected. Check your Excel sheet or Custom Rows range.</p>";
       } else {
-        for (let i = 0; i < Math.min(batch.length, cols * 3); i += cols) {
-          chunks.push(batch.slice(i, i + cols));
-        }
+        chunks.forEach((chunk, idx) => {
+          const wrap = document.createElement("div");
+          wrap.className = "modal-strip-wrap";
+          const lbl = document.createElement("div");
+          lbl.className = "modal-strip-label";
+          lbl.textContent = `Strip #${idx + 1}`;
+          wrap.appendChild(lbl);
+          wrap.appendChild(createStripDom(chunk, 7.0, false));
+          body.appendChild(wrap);
+        });
       }
 
-      for (const rowChunk of chunks) {
-        const strip = document.createElement("div");
-        strip.className = "roll-row";
-        strip.style.paddingLeft = `${mLeft * previewScale}px`;
-        strip.style.paddingRight = `${mLeft * previewScale}px`;
-
-        for (let c = 0; c < cols; c++) {
-          const cell = document.createElement("div");
-          cell.className = "roll-cell";
-          cell.style.width = `${wMm * previewScale}px`;
-          cell.style.height = `${hMm * previewScale}px`;
-          if (c < cols - 1 && gap > 0) cell.style.marginRight = `${gap * previewScale}px`;
-
-          const itemRow = rowChunk[c];
-          if (itemRow) {
-            for (const obj of objects) {
-              cell.appendChild(renderElementNode(obj, itemRow, previewScale, false));
-            }
-          }
-          strip.appendChild(cell);
-        }
-        container.appendChild(strip);
-      }
+      modal.classList.add("open");
     }
 
     function renderControlList() {
@@ -710,7 +906,7 @@
         const div = document.createElement("div");
         div.className = "obj-list-item" + (obj.id === selectedId ? " active" : "");
         const label = obj.sourceType === "custom" ? `"${obj.customText}"` : `[${obj.colName}]`;
-        div.innerHTML = `<span>${obj.id}</span><span>${label}</span>`;
+        div.innerHTML = `<span>${obj.id} (${obj.align || "left"})</span><span>${label}</span>`;
         div.addEventListener("click", () => {
           selectedId = obj.id;
           syncPropertyPanel();
@@ -773,6 +969,10 @@
           obj.font = $("propFont").value;
           obj.size = parseFloat($("propSize").value) || 8;
           obj.align = $("propAlign").value;
+          if (obj.align === "center") {
+            obj.x = 0;
+            $("propX").value = 0;
+          }
           obj.bold = $("propBold").checked;
           obj.italic = $("propItalic").checked;
           obj.underline = $("propUnderline").checked;
@@ -793,9 +993,29 @@
         $(id).addEventListener("input", updateSelected);
         $(id).addEventListener("change", updateSelected);
       });
+
+      $("btnCenterObj").addEventListener("click", () => {
+        const obj = objects.find(o => o.id === selectedId);
+        if (!obj) return;
+        obj.align = "center";
+        obj.x = 0;
+        syncPropertyPanel();
+        renderControlList();
+        renderCanvas();
+      });
+
+      $("btnCenterCode").addEventListener("click", () => {
+        const obj = objects.find(o => o.id === selectedId);
+        if (!obj) return;
+        const wMm = parseFloat($("lblW").value) || 24.8;
+        const codeW = obj.codeW || 16;
+        obj.x = Math.max(0, +((wMm - codeW) / 2).toFixed(1));
+        syncPropertyPanel();
+        renderControlList();
+        renderCanvas();
+      });
     }
 
-    // Excel Parsing (Respects "First Row Is Column Name" like WagLabel)
     function parseActiveSheet() {
       if (!workbook) return;
       const sheetName = $("sheetSelect").value;
@@ -822,7 +1042,6 @@
         });
       }
 
-      // Auto-map existing objects to available columns if needed
       objects.forEach((o, idx) => {
         if (!columnNames.includes(o.colName) && columnNames[idx]) {
           o.colName = columnNames[idx];
@@ -852,9 +1071,15 @@
     $("sheetSelect").addEventListener("change", parseActiveSheet);
     $("hasHeaderChk").addEventListener("change", parseActiveSheet);
 
-    // Preset & Dimension listeners
+    document.querySelectorAll('input[name="rowMode"]').forEach(r => {
+      r.addEventListener("change", (e) => {
+        $("customRowsSpec").disabled = e.target.value !== "custom";
+        renderStripPreview();
+      });
+    });
+
     $("presetSelect").addEventListener("change", (e) => {
-      const [w, h, c, ml, mr, gap] = e.target.value.split(",").map(Number);
+      const [w, h, c, ml, gap] = e.target.value.split(",").map(Number);
       $("lblW").value = w;
       $("lblH").value = h;
       $("colsAcross").value = c;
@@ -863,12 +1088,11 @@
       renderCanvas();
     });
 
-    ["lblW", "lblH", "colsAcross", "marginLeft", "colGap", "zoomSelect", "previewRowIdx", "startRow", "endRow", "copiesPerRow", "fillMode"].forEach(id => {
+    ["lblW", "lblH", "colsAcross", "marginLeft", "colGap", "zoomSelect", "previewRowIdx", "customRowsSpec", "copiesPerRow", "fillMode", "offsetLeft", "offsetTop"].forEach(id => {
       $(id).addEventListener("input", renderCanvas);
       $(id).addEventListener("change", renderCanvas);
     });
 
-    // Add / Delete Objects
     $("btnAddText").addEventListener("click", () => {
       const idx = objects.length;
       const newObj = {
@@ -877,14 +1101,14 @@
         sourceType: "col",
         colName: columnNames[Math.min(idx, columnNames.length - 1)] || "Col1",
         customText: "Text",
-        x: 1.5,
+        x: 0,
         y: Math.min(9, idx * 3),
         font: "Arial",
         size: 8,
         bold: false,
         italic: false,
         underline: false,
-        align: "left"
+        align: "center"
       };
       objects.push(newObj);
       selectedId = newObj.id;
@@ -900,7 +1124,7 @@
         sourceType: "col",
         colName: columnNames[0] || "Col1",
         customText: "12345",
-        x: 1.5,
+        x: 3.4,
         y: 6.5,
         codeW: 18,
         codeH: 4.5
@@ -940,7 +1164,6 @@
       renderCanvas();
     });
 
-    // Save / Load Layout JSON
     $("btnSaveTpl").addEventListener("click", () => {
       const payload = {
         lblW: $("lblW").value,
@@ -978,7 +1201,6 @@
       reader.readAsText(f);
     });
 
-    // Build Physical MM Print Output (4-Across Rows)
     function buildPrintPages() {
       const out = $("printOutput");
       out.innerHTML = "";
@@ -991,7 +1213,6 @@
       const fillMode = $("fillMode").value;
       const totalW = (mLeft * 2) + (wMm * cols) + (gap * (cols - 1));
 
-      // Inject dynamic @page rule matching exact strip size
       let pageStyle = document.getElementById("dynamicPageStyle");
       if (!pageStyle) {
         pageStyle = document.createElement("style");
@@ -1001,46 +1222,21 @@
       pageStyle.textContent = `@media print { @page { size: ${totalW}mm ${hMm}mm; margin: 0; } }`;
 
       const batch = getTargetBatchRows();
-      const chunks = [];
-      if (fillMode === "duplicate") {
-        for (const r of batch) chunks.push(Array(cols).fill(r));
-      } else {
-        for (let i = 0; i < batch.length; i += cols) {
-          chunks.push(batch.slice(i, i + cols));
-        }
-      }
-
-      // 1 mm = 3.7795275591 px at 96 DPI CSS reference pixel
+      const chunks = buildChunks(batch, cols, fillMode);
       const cssPxPerMm = 3.7795275591;
 
       for (const rowChunk of chunks) {
-        const printRow = document.createElement("div");
-        printRow.className = "print-row";
-        printRow.style.width = `${totalW}mm`;
-        printRow.style.height = `${hMm}mm`;
-        printRow.style.paddingLeft = `${mLeft}mm`;
-        printRow.style.paddingRight = `${mLeft}mm`;
-
-        for (let c = 0; c < cols; c++) {
-          const sticker = document.createElement("div");
-          sticker.className = "print-sticker";
-          sticker.style.width = `${wMm}mm`;
-          sticker.style.height = `${hMm}mm`;
-          if (c < cols - 1 && gap > 0) sticker.style.marginRight = `${gap}mm`;
-
-          const itemRow = rowChunk[c];
-          if (itemRow) {
-            for (const obj of objects) {
-              sticker.appendChild(renderElementNode(obj, itemRow, cssPxPerMm, false));
-            }
-          }
-          printRow.appendChild(sticker);
-        }
-        out.appendChild(printRow);
+        out.appendChild(createStripDom(rowChunk, cssPxPerMm, true));
       }
     }
 
-    $("btnPreviewBatch").addEventListener("click", renderStripPreview);
+    $("btnPreviewBatch").addEventListener("click", openBatchModal);
+    $("btnCloseModal").addEventListener("click", () => $("batchModal").classList.remove("open"));
+    $("btnModalPrint").addEventListener("click", () => {
+      $("batchModal").classList.remove("open");
+      buildPrintPages();
+      window.print();
+    });
     $("btnPrintBatch").addEventListener("click", () => {
       buildPrintPages();
       window.print();
